@@ -1,0 +1,201 @@
+
+<!DOCTYPE html>
+<html lang="he">
+<head>
+  <meta charset="UTF-8">
+  <title>מעקב תשלומים - חוג כדורגל</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      direction: rtl;
+      background: #f9f9f9;
+      max-width: 100%;
+    }
+    h1 {
+      font-size: 1.5em;
+      margin-bottom: 10px;
+    }
+    input[type="text"], select, button {
+      font-size: 1em;
+      padding: 8px;
+      margin: 5px 0;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button.delete-btn {
+      background-color: red;
+      font-size: 0.9em;
+      padding: 6px;
+    }
+    .table-wrapper {
+      overflow-x: auto;
+      margin-top: 15px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 700px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 6px;
+      text-align: center;
+    }
+    th {
+      background-color: #e0e0e0;
+    }
+    .paid {
+      background-color: #d4edda;
+    }
+    .unpaid {
+      background-color: #f8d7da;
+    }
+  </style>
+</head>
+<body>
+  <h1>אפליקציית מעקב תשלומים - חוג כדורגל</h1>
+
+  <label>הוסף משתתף חדש:</label>
+  <input type="text" id="nameInput" placeholder="שם המשתתף">
+  <button onclick="addParticipant()">➕ הוסף</button>
+
+  <label>בחר חודש:</label>
+  <select id="monthSelect" onchange="renderTable()">
+    <option value="ינואר">ינואר</option>
+    <option value="פברואר">פברואר</option>
+    <option value="מרץ">מרץ</option>
+    <option value="אפריל">אפריל</option>
+    <option value="מאי">מאי</option>
+    <option value="יוני">יוני</option>
+    <option value="יולי">יולי</option>
+    <option value="אוגוסט">אוגוסט</option>
+    <option value="ספטמבר">ספטמבר</option>
+    <option value="אוקטובר">אוקטובר</option>
+    <option value="נובמבר">נובמבר</option>
+    <option value="דצמבר">דצמבר</option>
+  </select>
+
+  <button onclick="exportData()">📁 שמור לקובץ</button>
+
+  <div class="table-wrapper">
+    <table id="paymentTable">
+      <thead>
+        <tr>
+          <th>שם</th>
+          <th>שילם</th>
+          <th>תאריך</th>
+          <th>הערות</th>
+          <th>שנה</th>
+          <th>מחיקה</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    let data = JSON.parse(localStorage.getItem("paymentData") || "{}");
+
+    function getSelectedMonth() {
+      return document.getElementById("monthSelect").value;
+    }
+
+    function renderTable() {
+      const tbody = document.querySelector("#paymentTable tbody");
+      const month = getSelectedMonth();
+      const year = new Date().getFullYear();
+      if (!data[month]) data[month] = {};
+      tbody.innerHTML = "";
+
+      Object.keys(data[month]).forEach(name => {
+        const info = data[month][name];
+        const row = document.createElement("tr");
+        row.className = info.paid ? "paid" : "unpaid";
+        row.innerHTML = `
+          <td>${name}</td>
+          <td><input type="checkbox" ${info.paid ? "checked" : ""} onchange="togglePayment('${month}', '${name}')"></td>
+          <td><input type="text" value="${info.date || ''}" onchange="updateDate('${month}', '${name}', this.value)"></td>
+          <td><input type="text" value="${info.note || ''}" onchange="updateNote('${month}', '${name}', this.value)"></td>
+          <td>${year}</td>
+          <td><button class="delete-btn" onclick="deleteParticipant('${month}', '${name}')">❌</button></td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      localStorage.setItem("paymentData", JSON.stringify(data));
+    }
+
+    function addParticipant() {
+      const name = document.getElementById("nameInput").value.trim();
+      if (!name) return;
+
+      const month = getSelectedMonth();
+      if (!data[month]) data[month] = {};
+
+      if (!data[month][name]) {
+        data[month][name] = { paid: false, date: '', note: '' };
+        localStorage.setItem("paymentData", JSON.stringify(data));
+        renderTable();
+        document.getElementById("nameInput").value = '';
+      } else {
+        alert("המשתתף כבר קיים בחודש הזה.");
+      }
+    }
+
+    function togglePayment(month, name) {
+      data[month][name].paid = !data[month][name].paid;
+
+      if (data[month][name].paid) {
+        const today = new Date();
+        const formattedDate = `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`;
+        data[month][name].date = formattedDate;
+      } else {
+        data[month][name].date = '';
+      }
+
+      localStorage.setItem("paymentData", JSON.stringify(data));
+      renderTable();
+    }
+
+    function updateDate(month, name, value) {
+      data[month][name].date = value;
+      localStorage.setItem("paymentData", JSON.stringify(data));
+    }
+
+    function updateNote(month, name, value) {
+      data[month][name].note = value;
+      localStorage.setItem("paymentData", JSON.stringify(data));
+    }
+
+    function deleteParticipant(month, name) {
+      if (confirm(`האם למחוק את ${name} מחודש ${month}?`)) {
+        delete data[month][name];
+        localStorage.setItem("paymentData", JSON.stringify(data));
+        renderTable();
+      }
+    }
+
+    function exportData() {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const today = new Date();
+      const fileName = `תשלומים_${today.getFullYear()}_${today.getMonth() + 1}.json`;
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    renderTable();
+  </script>
+</body>
+</html>
